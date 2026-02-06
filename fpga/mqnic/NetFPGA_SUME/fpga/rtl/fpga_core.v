@@ -25,7 +25,7 @@ module fpga_core #
     parameter RELEASE_INFO = 32'h00000000,
 
     // Structural configuration
-    parameter IF_COUNT = 2,
+    parameter IF_COUNT = 1,
     parameter PORTS_PER_IF = 1,
     parameter SCHED_PER_IF = PORTS_PER_IF,
     parameter PORT_MASK = 0,
@@ -174,10 +174,7 @@ module fpga_core #
      * GPIO
      */
     input  wire [1:0]                         btn,
-    output wire [1:0]                         sfp_1_led,
-    output wire [1:0]                         sfp_2_led,
-    output wire [1:0]                         sfp_3_led,
-    output wire [1:0]                         sfp_4_led,
+    output wire [1:0]                         sfp_led,
     output wire [1:0]                         led,
 
     /*
@@ -265,66 +262,21 @@ module fpga_core #
     /*
      * Ethernet: SFP+
      */
-    input  wire                               sfp_1_tx_clk,
-    input  wire                               sfp_1_tx_rst,
-    output wire [XGMII_DATA_WIDTH-1:0]        sfp_1_txd,
-    output wire [XGMII_CTRL_WIDTH-1:0]        sfp_1_txc,
-    input  wire                               sfp_1_rx_clk,
-    input  wire                               sfp_1_rx_rst,
-    input  wire [XGMII_DATA_WIDTH-1:0]        sfp_1_rxd,
-    input  wire [XGMII_CTRL_WIDTH-1:0]        sfp_1_rxc,
-    input  wire                               sfp_1_rx_status,
+    input  wire                               sfp_tx_clk,
+    input  wire                               sfp_tx_rst,
+    output wire [XGMII_DATA_WIDTH-1:0]        sfp_txd,
+    output wire [XGMII_CTRL_WIDTH-1:0]        sfp_txc,
+    input  wire                               sfp_rx_clk,
+    input  wire                               sfp_rx_rst,
+    input  wire [XGMII_DATA_WIDTH-1:0]        sfp_rxd,
+    input  wire [XGMII_CTRL_WIDTH-1:0]        sfp_rxc,
+    input  wire                               sfp_rx_status,
 
-    input  wire                               sfp_2_tx_clk,
-    input  wire                               sfp_2_tx_rst,
-    output wire [XGMII_DATA_WIDTH-1:0]        sfp_2_txd,
-    output wire [XGMII_CTRL_WIDTH-1:0]        sfp_2_txc,
-    input  wire                               sfp_2_rx_clk,
-    input  wire                               sfp_2_rx_rst,
-    input  wire [XGMII_DATA_WIDTH-1:0]        sfp_2_rxd,
-    input  wire [XGMII_CTRL_WIDTH-1:0]        sfp_2_rxc,
-    input  wire                               sfp_2_rx_status,
-
-    input  wire                               sfp_3_tx_clk,
-    input  wire                               sfp_3_tx_rst,
-    output wire [XGMII_DATA_WIDTH-1:0]        sfp_3_txd,
-    output wire [XGMII_CTRL_WIDTH-1:0]        sfp_3_txc,
-    input  wire                               sfp_3_rx_clk,
-    input  wire                               sfp_3_rx_rst,
-    input  wire [XGMII_DATA_WIDTH-1:0]        sfp_3_rxd,
-    input  wire [XGMII_CTRL_WIDTH-1:0]        sfp_3_rxc,
-    input  wire                               sfp_3_rx_status,
-
-    input  wire                               sfp_4_tx_clk,
-    input  wire                               sfp_4_tx_rst,
-    output wire [XGMII_DATA_WIDTH-1:0]        sfp_4_txd,
-    output wire [XGMII_CTRL_WIDTH-1:0]        sfp_4_txc,
-    input  wire                               sfp_4_rx_clk,
-    input  wire                               sfp_4_rx_rst,
-    input  wire [XGMII_DATA_WIDTH-1:0]        sfp_4_rxd,
-    input  wire [XGMII_CTRL_WIDTH-1:0]        sfp_4_rxc,
-    input  wire                               sfp_4_rx_status,
-
-    input  wire                               sfp_1_mod_detect,
-    input  wire                               sfp_2_mod_detect,
-    input  wire                               sfp_3_mod_detect,
-    input  wire                               sfp_4_mod_detect,
-    output wire [1:0]                         sfp_1_rs,
-    output wire [1:0]                         sfp_2_rs,
-    output wire [1:0]                         sfp_3_rs,
-    output wire [1:0]                         sfp_4_rs,
-    input  wire                               sfp_1_los,
-    input  wire                               sfp_2_los,
-    input  wire                               sfp_3_los,
-    input  wire                               sfp_4_los,
-    output wire                               sfp_1_tx_disable,
-    output wire                               sfp_2_tx_disable,
-    output wire                               sfp_3_tx_disable,
-    output wire                               sfp_4_tx_disable,
-    input  wire                               sfp_1_tx_fault,
-    input  wire                               sfp_2_tx_fault,
-    input  wire                               sfp_3_tx_fault,
-    input  wire                               sfp_4_tx_fault
+    input  wire                               sfp_mod_detect,
+    output wire [1:0]                         sfp_rs,
+    input  wire                               sfp_los,
+    output wire                               sfp_tx_disable,
+    input  wire                               sfp_tx_fault
 );
 
 parameter PORT_COUNT = IF_COUNT*PORTS_PER_IF;
@@ -339,7 +291,7 @@ localparam RB_BASE_ADDR = 16'h1000;
 localparam RBB = RB_BASE_ADDR & {AXIL_CTRL_ADDR_WIDTH{1'b1}};
 
 initial begin
-    if (PORT_COUNT > 4) begin
+    if (PORT_COUNT > 1) begin
         $error("Error: Max port count exceeded (instance %m)");
         $finish;
     end
@@ -378,15 +330,9 @@ reg ctrl_reg_wr_ack_reg = 1'b0;
 reg [AXIL_CTRL_DATA_WIDTH-1:0] ctrl_reg_rd_data_reg = {AXIL_CTRL_DATA_WIDTH{1'b0}};
 reg ctrl_reg_rd_ack_reg = 1'b0;
 
-reg [1:0] sfp_1_rs_reg = 2'b11;
-reg [1:0] sfp_2_rs_reg = 2'b11;
-reg [1:0] sfp_3_rs_reg = 2'b11;
-reg [1:0] sfp_4_rs_reg = 2'b11;
+reg [1:0] sfp_rs_reg = 2'b11;
 
-reg sfp_1_tx_disable_reg = 1'b0;
-reg sfp_2_tx_disable_reg = 1'b0;
-reg sfp_3_tx_disable_reg = 1'b0;
-reg sfp_4_tx_disable_reg = 1'b0;
+reg sfp_tx_disable_reg = 1'b0;
 
 reg i2c_scl_o_reg = 1'b1;
 reg i2c_sda_o_reg = 1'b1;
@@ -397,15 +343,9 @@ assign ctrl_reg_rd_data = ctrl_reg_rd_data_reg;
 assign ctrl_reg_rd_wait = 1'b0;
 assign ctrl_reg_rd_ack = ctrl_reg_rd_ack_reg;
 
-assign sfp_1_rs = sfp_1_rs_reg;
-assign sfp_2_rs = sfp_2_rs_reg;
-assign sfp_3_rs = sfp_3_rs_reg;
-assign sfp_4_rs = sfp_4_rs_reg;
+assign sfp_rs = sfp_rs_reg;
 
-assign sfp_1_tx_disable = sfp_1_tx_disable_reg;
-assign sfp_2_tx_disable = sfp_2_tx_disable_reg;
-assign sfp_3_tx_disable = sfp_3_tx_disable_reg;
-assign sfp_4_tx_disable = sfp_4_tx_disable_reg;
+assign sfp_tx_disable = sfp_tx_disable_reg;
 
 assign i2c_scl_o = i2c_scl_o_reg;
 assign i2c_scl_t = i2c_scl_o_reg;
@@ -433,22 +373,10 @@ always @(posedge clk_250mhz) begin
             end
             // XCVR GPIO
             RBB+8'h1C: begin
-                // XCVR GPIO: control 0123
+                // XCVR GPIO: control 0
                 if (ctrl_reg_wr_strb[0]) begin
-                    sfp_1_tx_disable_reg <= ctrl_reg_wr_data[5];
-                    sfp_1_rs_reg <= ctrl_reg_wr_data[7:6];
-                end
-                if (ctrl_reg_wr_strb[1]) begin
-                    sfp_2_tx_disable_reg <= ctrl_reg_wr_data[13];
-                    sfp_2_rs_reg <= ctrl_reg_wr_data[15:14];
-                end
-                if (ctrl_reg_wr_strb[2]) begin
-                    sfp_3_tx_disable_reg <= ctrl_reg_wr_data[21];
-                    sfp_3_rs_reg <= ctrl_reg_wr_data[23:22];
-                end
-                if (ctrl_reg_wr_strb[3]) begin
-                    sfp_4_tx_disable_reg <= ctrl_reg_wr_data[29];
-                    sfp_4_rs_reg <= ctrl_reg_wr_data[31:30];
+                    sfp_tx_disable_reg <= ctrl_reg_wr_data[5];
+                    sfp_rs_reg <= ctrl_reg_wr_data[7:6];
                 end
             end
             default: ctrl_reg_wr_ack_reg <= 1'b0;
@@ -475,30 +403,12 @@ always @(posedge clk_250mhz) begin
             RBB+8'h14: ctrl_reg_rd_data_reg <= 32'h00000100;             // XCVR GPIO: Version
             RBB+8'h18: ctrl_reg_rd_data_reg <= 0;                        // XCVR GPIO: Next header
             RBB+8'h1C: begin
-                // XCVR GPIO: control 0123
-                ctrl_reg_rd_data_reg[0] <= sfp_1_mod_detect;
-                ctrl_reg_rd_data_reg[1] <= sfp_1_tx_fault;
-                ctrl_reg_rd_data_reg[2] <= sfp_1_los;
-                ctrl_reg_rd_data_reg[5] <= sfp_1_tx_disable_reg;
-                ctrl_reg_rd_data_reg[7:6] <= sfp_1_rs_reg;
-
-                ctrl_reg_rd_data_reg[8] <= sfp_2_mod_detect;
-                ctrl_reg_rd_data_reg[9] <= sfp_2_tx_fault;
-                ctrl_reg_rd_data_reg[10] <= sfp_2_los;
-                ctrl_reg_rd_data_reg[13] <= sfp_2_tx_disable_reg;
-                ctrl_reg_rd_data_reg[15:14] <= sfp_2_rs_reg;
-
-                ctrl_reg_rd_data_reg[16] <= sfp_3_mod_detect;
-                ctrl_reg_rd_data_reg[17] <= sfp_3_tx_fault;
-                ctrl_reg_rd_data_reg[18] <= sfp_3_los;
-                ctrl_reg_rd_data_reg[21] <= sfp_3_tx_disable_reg;
-                ctrl_reg_rd_data_reg[23:22] <= sfp_3_rs_reg;
-
-                ctrl_reg_rd_data_reg[24] <= sfp_4_mod_detect;
-                ctrl_reg_rd_data_reg[25] <= sfp_4_tx_fault;
-                ctrl_reg_rd_data_reg[26] <= sfp_4_los;
-                ctrl_reg_rd_data_reg[29] <= sfp_4_tx_disable_reg;
-                ctrl_reg_rd_data_reg[31:30] <= sfp_4_rs_reg;
+                // XCVR GPIO: control 0
+                ctrl_reg_rd_data_reg[0] <= sfp_mod_detect;
+                ctrl_reg_rd_data_reg[1] <= sfp_tx_fault;
+                ctrl_reg_rd_data_reg[2] <= sfp_los;
+                ctrl_reg_rd_data_reg[5] <= sfp_tx_disable_reg;
+                ctrl_reg_rd_data_reg[7:6] <= sfp_rs_reg;
             end
             default: ctrl_reg_rd_ack_reg <= 1'b0;
         endcase
@@ -508,25 +418,16 @@ always @(posedge clk_250mhz) begin
         ctrl_reg_wr_ack_reg <= 1'b0;
         ctrl_reg_rd_ack_reg <= 1'b0;
 
-        sfp_1_rs_reg <= 2'b11;
-        sfp_2_rs_reg <= 2'b11;
-        sfp_3_rs_reg <= 2'b11;
-        sfp_4_rs_reg <= 2'b11;
+        sfp_rs_reg <= 2'b11;
 
-        sfp_1_tx_disable_reg <= 1'b0;
-        sfp_2_tx_disable_reg <= 1'b0;
-        sfp_3_tx_disable_reg <= 1'b0;
-        sfp_4_tx_disable_reg <= 1'b0;
+        sfp_tx_disable_reg <= 1'b0;
 
         i2c_scl_o_reg <= 1'b1;
         i2c_sda_o_reg <= 1'b1;
     end
 end
 
-assign sfp_1_led = 2'b00;
-assign sfp_2_led = 2'b00;
-assign sfp_3_led = 2'b00;
-assign sfp_4_led = 2'b00;
+assign sfp_led = 2'b00;
 assign led[0] = ptp_pps_str;
 assign led[1] = 1'b0;
 
@@ -588,7 +489,7 @@ wire [PORT_COUNT*XGMII_DATA_WIDTH-1:0]  port_xgmii_rxd;
 wire [PORT_COUNT*XGMII_CTRL_WIDTH-1:0]  port_xgmii_rxc;
 
 mqnic_port_map_phy_xgmii #(
-    .PHY_COUNT(4),
+    .PHY_COUNT(1),
     .PORT_MASK(PORT_MASK),
     .PORT_GROUP_SIZE(1),
 
@@ -602,17 +503,17 @@ mqnic_port_map_phy_xgmii #(
 )
 mqnic_port_map_phy_xgmii_inst (
     // towards PHY
-    .phy_xgmii_tx_clk({sfp_4_tx_clk, sfp_3_tx_clk, sfp_2_tx_clk, sfp_1_tx_clk}),
-    .phy_xgmii_tx_rst({sfp_4_tx_rst, sfp_3_tx_rst, sfp_2_tx_rst, sfp_1_tx_rst}),
-    .phy_xgmii_txd({sfp_4_txd, sfp_3_txd, sfp_2_txd, sfp_1_txd}),
-    .phy_xgmii_txc({sfp_4_txc, sfp_3_txc, sfp_2_txc, sfp_1_txc}),
-    .phy_tx_status(4'hf),
+    .phy_xgmii_tx_clk({sfp_tx_clk}),
+    .phy_xgmii_tx_rst({sfp_tx_rst}),
+    .phy_xgmii_txd({sfp_txd}),
+    .phy_xgmii_txc({sfp_txc}),
+    .phy_tx_status(1'b1),
 
-    .phy_xgmii_rx_clk({sfp_4_rx_clk, sfp_3_rx_clk, sfp_2_rx_clk, sfp_1_rx_clk}),
-    .phy_xgmii_rx_rst({sfp_4_rx_rst, sfp_3_rx_rst, sfp_2_rx_rst, sfp_1_rx_rst}),
-    .phy_xgmii_rxd({sfp_4_rxd, sfp_3_rxd, sfp_2_rxd, sfp_1_rxd}),
-    .phy_xgmii_rxc({sfp_4_rxc, sfp_3_rxc, sfp_2_rxc, sfp_1_rxc}),
-    .phy_rx_status({sfp_4_rx_status, sfp_3_rx_status, sfp_2_rx_status, sfp_1_rx_status}),
+    .phy_xgmii_rx_clk({sfp_rx_clk}),
+    .phy_xgmii_rx_rst({sfp_rx_rst}),
+    .phy_xgmii_rxd({sfp_rxd}),
+    .phy_xgmii_rxc({sfp_rxc}),
+    .phy_rx_status({sfp_rx_status}),
 
     // towards MAC
     .port_xgmii_tx_clk(port_xgmii_tx_clk),

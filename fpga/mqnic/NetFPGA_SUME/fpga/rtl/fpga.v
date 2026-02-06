@@ -25,7 +25,7 @@ module fpga #
     parameter RELEASE_INFO = 32'h00000000,
 
     // Structural configuration
-    parameter IF_COUNT = 2,
+    parameter IF_COUNT = 1,
     parameter PORTS_PER_IF = 1,
     parameter SCHED_PER_IF = PORTS_PER_IF,
     parameter PORT_MASK = 0,
@@ -143,10 +143,7 @@ module fpga #
      * GPIO
      */
     input  wire [1:0]   btn,
-    output wire [1:0]   sfp_1_led,
-    output wire [1:0]   sfp_2_led,
-    output wire [1:0]   sfp_3_led,
-    output wire [1:0]   sfp_4_led,
+    output wire [1:0]   sfp_led,
     output wire [1:0]   led,
 
     /*
@@ -170,45 +167,18 @@ module fpga #
     /*
      * Ethernet: SFP+
      */
-    input  wire         sfp_1_rx_p,
-    input  wire         sfp_1_rx_n,
-    output wire         sfp_1_tx_p,
-    output wire         sfp_1_tx_n,
-    input  wire         sfp_2_rx_p,
-    input  wire         sfp_2_rx_n,
-    output wire         sfp_2_tx_p,
-    output wire         sfp_2_tx_n,
-    input  wire         sfp_3_rx_p,
-    input  wire         sfp_3_rx_n,
-    output wire         sfp_3_tx_p,
-    output wire         sfp_3_tx_n,
-    input  wire         sfp_4_rx_p,
-    input  wire         sfp_4_rx_n,
-    output wire         sfp_4_tx_p,
-    output wire         sfp_4_tx_n,
+    input  wire         sfp_rx_p,
+    input  wire         sfp_rx_n,
+    output wire         sfp_tx_p,
+    output wire         sfp_tx_n,
     input  wire         sfp_mgt_refclk_p,
     input  wire         sfp_mgt_refclk_n,
     output wire         sfp_clk_rst,
-    input  wire         sfp_1_mod_detect,
-    input  wire         sfp_2_mod_detect,
-    input  wire         sfp_3_mod_detect,
-    input  wire         sfp_4_mod_detect,
-    output wire [1:0]   sfp_1_rs,
-    output wire [1:0]   sfp_2_rs,
-    output wire [1:0]   sfp_3_rs,
-    output wire [1:0]   sfp_4_rs,
-    input  wire         sfp_1_los,
-    input  wire         sfp_2_los,
-    input  wire         sfp_3_los,
-    input  wire         sfp_4_los,
-    output wire         sfp_1_tx_disable,
-    output wire         sfp_2_tx_disable,
-    output wire         sfp_3_tx_disable,
-    output wire         sfp_4_tx_disable,
-    input  wire         sfp_1_tx_fault,
-    input  wire         sfp_2_tx_fault,
-    input  wire         sfp_3_tx_fault,
-    input  wire         sfp_4_tx_fault
+    input  wire         sfp_mod_detect,
+    output wire [1:0]   sfp_rs,
+    input  wire         sfp_los,
+    output wire         sfp_tx_disable,
+    input  wire         sfp_tx_fault
 );
 
 // PTP configuration
@@ -347,10 +317,7 @@ sync_reset_125mhz_inst (
 
 // GPIO
 wire [1:0] btn_int;
-wire [1:0] sfp_1_led_int;
-wire [1:0] sfp_2_led_int;
-wire [1:0] sfp_3_led_int;
-wire [1:0] sfp_4_led_int;
+wire [1:0] sfp_led_int;
 wire [1:0] led_int;
 
 debounce_switch #(
@@ -399,34 +366,19 @@ always @(posedge pcie_user_clk) begin
     i2c_sda_t_reg <= i2c_sda_t_int;
 end
 
-wire sfp_1_mod_detect_int;
-wire sfp_2_mod_detect_int;
-wire sfp_3_mod_detect_int;
-wire sfp_4_mod_detect_int;
-
-wire sfp_1_los_int;
-wire sfp_2_los_int;
-wire sfp_3_los_int;
-wire sfp_4_los_int;
-
-wire sfp_1_tx_fault_int;
-wire sfp_2_tx_fault_int;
-wire sfp_3_tx_fault_int;
-wire sfp_4_tx_fault_int;
+wire sfp_mod_detect_int;
+wire sfp_los_int;
+wire sfp_tx_fault_int;
 
 sync_signal #(
-    .WIDTH(14),
+    .WIDTH(5),
     .N(2)
 )
 sync_signal_inst (
     .clk(pcie_user_clk),
-    .in({sfp_1_mod_detect, sfp_2_mod_detect, sfp_3_mod_detect, sfp_4_mod_detect,
-        sfp_1_los, sfp_2_los, sfp_3_los, sfp_4_los,
-        sfp_1_tx_fault, sfp_2_tx_fault, sfp_3_tx_fault, sfp_4_tx_fault,
+    .in({sfp_mod_detect, sfp_los, sfp_tx_fault,
         i2c_scl_i, i2c_sda_i}),
-    .out({sfp_1_mod_detect_int, sfp_2_mod_detect_int, sfp_3_mod_detect_int, sfp_4_mod_detect_int,
-        sfp_1_los_int, sfp_2_los_int, sfp_3_los_int, sfp_4_los_int,
-        sfp_1_tx_fault_int, sfp_2_tx_fault_int, sfp_3_tx_fault_int, sfp_4_tx_fault_int,
+    .out({sfp_mod_detect_int, sfp_los_int, sfp_tx_fault_int,
         i2c_scl_i_int, i2c_sda_i_int})
 );
 
@@ -934,38 +886,14 @@ pcie3_7x_inst (
 );
 
 // XGMII 10G PHY
-wire                         sfp_1_tx_clk_int = clk_156mhz_int;
-wire                         sfp_1_tx_rst_int = rst_156mhz_int;
-wire [XGMII_DATA_WIDTH-1:0]  sfp_1_txd_int;
-wire [XGMII_CTRL_WIDTH-1:0]  sfp_1_txc_int;
-wire                         sfp_1_rx_clk_int = clk_156mhz_int;
-wire                         sfp_1_rx_rst_int = rst_156mhz_int;
-wire [XGMII_DATA_WIDTH-1:0]  sfp_1_rxd_int;
-wire [XGMII_CTRL_WIDTH-1:0]  sfp_1_rxc_int;
-wire                         sfp_2_tx_clk_int = clk_156mhz_int;
-wire                         sfp_2_tx_rst_int = rst_156mhz_int;
-wire [XGMII_DATA_WIDTH-1:0]  sfp_2_txd_int;
-wire [XGMII_CTRL_WIDTH-1:0]  sfp_2_txc_int;
-wire                         sfp_2_rx_clk_int = clk_156mhz_int;
-wire                         sfp_2_rx_rst_int = rst_156mhz_int;
-wire [XGMII_DATA_WIDTH-1:0]  sfp_2_rxd_int;
-wire [XGMII_CTRL_WIDTH-1:0]  sfp_2_rxc_int;
-wire                         sfp_3_tx_clk_int = clk_156mhz_int;
-wire                         sfp_3_tx_rst_int = rst_156mhz_int;
-wire [XGMII_DATA_WIDTH-1:0]  sfp_3_txd_int;
-wire [XGMII_CTRL_WIDTH-1:0]  sfp_3_txc_int;
-wire                         sfp_3_rx_clk_int = clk_156mhz_int;
-wire                         sfp_3_rx_rst_int = rst_156mhz_int;
-wire [XGMII_DATA_WIDTH-1:0]  sfp_3_rxd_int;
-wire [XGMII_CTRL_WIDTH-1:0]  sfp_3_rxc_int;
-wire                         sfp_4_tx_clk_int = clk_156mhz_int;
-wire                         sfp_4_tx_rst_int = rst_156mhz_int;
-wire [XGMII_DATA_WIDTH-1:0]  sfp_4_txd_int;
-wire [XGMII_CTRL_WIDTH-1:0]  sfp_4_txc_int;
-wire                         sfp_4_rx_clk_int = clk_156mhz_int;
-wire                         sfp_4_rx_rst_int = rst_156mhz_int;
-wire [XGMII_DATA_WIDTH-1:0]  sfp_4_rxd_int;
-wire [XGMII_CTRL_WIDTH-1:0]  sfp_4_rxc_int;
+wire                         sfp_tx_clk_int = clk_156mhz_int;
+wire                         sfp_tx_rst_int = rst_156mhz_int;
+wire [XGMII_DATA_WIDTH-1:0]  sfp_txd_int;
+wire [XGMII_CTRL_WIDTH-1:0]  sfp_txc_int;
+wire                         sfp_rx_clk_int = clk_156mhz_int;
+wire                         sfp_rx_rst_int = rst_156mhz_int;
+wire [XGMII_DATA_WIDTH-1:0]  sfp_rxd_int;
+wire [XGMII_CTRL_WIDTH-1:0]  sfp_rxc_int;
 
 wire sfp_reset_in;
 wire sfp_txusrclk;
@@ -1033,23 +961,14 @@ assign sfp_config_vector[518]     = 0; // clear_pcs_status2;
 assign sfp_config_vector[519]     = 0; // clear_test_patt_err_count;
 assign sfp_config_vector[535:520] = 0;
 
-wire [447:0] sfp_1_status_vector;
-wire [447:0] sfp_2_status_vector;
-wire [447:0] sfp_3_status_vector;
-wire [447:0] sfp_4_status_vector;
+wire [447:0] sfp_status_vector;
 
-wire sfp_1_rx_block_lock = sfp_1_status_vector[256];
-wire sfp_2_rx_block_lock = sfp_2_status_vector[256];
-wire sfp_3_rx_block_lock = sfp_3_status_vector[256];
-wire sfp_4_rx_block_lock = sfp_4_status_vector[256];
+wire sfp_rx_block_lock = sfp_status_vector[256];
 
-wire [7:0] sfp_1_core_status;
-wire [7:0] sfp_2_core_status;
-wire [7:0] sfp_3_core_status;
-wire [7:0] sfp_4_core_status;
+wire [7:0] sfp_core_status;
 
 ten_gig_eth_pcs_pma_0
-sfp_1_pcs_pma_inst (
+sfp_pcs_pma_inst (
     .dclk(clk_125mhz_int),
     .rxrecclk_out(),
     .refclk_p(sfp_mgt_refclk_p),
@@ -1067,171 +986,18 @@ sfp_1_pcs_pma_inst (
     .txuserrdy_out(sfp_txuserrdy),
     .reset_counter_done_out(sfp_reset_counter_done),
     .reset(sfp_reset_in),
-    .xgmii_txd(sfp_1_txd_int),
-    .xgmii_txc(sfp_1_txc_int),
-    .xgmii_rxd(sfp_1_rxd_int),
-    .xgmii_rxc(sfp_1_rxc_int),
-    .txp(sfp_1_tx_p),
-    .txn(sfp_1_tx_n),
-    .rxp(sfp_1_rx_p),
-    .rxn(sfp_1_rx_n),
+    .xgmii_txd(sfp_txd_int),
+    .xgmii_txc(sfp_txc_int),
+    .xgmii_rxd(sfp_rxd_int),
+    .xgmii_rxc(sfp_rxc_int),
+    .txp(sfp_tx_p),
+    .txn(sfp_tx_n),
+    .rxp(sfp_rx_p),
+    .rxn(sfp_rx_n),
     .configuration_vector(sfp_config_vector),
-    .status_vector(sfp_1_status_vector),
-    .core_status(sfp_1_core_status),
+    .status_vector(sfp_status_vector),
+    .core_status(sfp_core_status),
     .resetdone_out(sfp_resetdone),
-    .signal_detect(1'b1),
-    .tx_fault(1'b0),
-    .drp_req(),
-    .drp_gnt(1'b1),
-    .drp_den_o(),
-    .drp_dwe_o(),
-    .drp_daddr_o(),
-    .drp_di_o(),
-    .drp_drdy_o(),
-    .drp_drpdo_o(),
-    .drp_den_i(1'b0),
-    .drp_dwe_i(1'b0),
-    .drp_daddr_i(16'd0),
-    .drp_di_i(16'd0),
-    .drp_drdy_i(1'b0),
-    .drp_drpdo_i(16'd0),
-    .pma_pmd_type(3'd0),
-    .tx_disable()
-);
-
-ten_gig_eth_pcs_pma_1
-sfp_2_pcs_pma_inst (
-    .dclk(clk_125mhz_int),
-    .rxrecclk_out(),
-    .coreclk(sfp_coreclk),
-    .txusrclk(sfp_txusrclk),
-    .txusrclk2(sfp_txusrclk2),
-    .txoutclk(),
-    .areset(sfp_reset_in),
-    .areset_coreclk(sfp_areset_datapathclk),
-    .gttxreset(sfp_gttxreset),
-    .gtrxreset(sfp_gtrxreset),
-    .sim_speedup_control(1'b0),
-    .txuserrdy(sfp_txuserrdy),
-    .qplllock(sfp_qplllock),
-    .qplloutclk(sfp_qplloutclk),
-    .qplloutrefclk(sfp_qplloutrefclk),
-    .reset_counter_done(sfp_reset_counter_done),
-    .xgmii_txd(sfp_2_txd_int),
-    .xgmii_txc(sfp_2_txc_int),
-    .xgmii_rxd(sfp_2_rxd_int),
-    .xgmii_rxc(sfp_2_rxc_int),
-    .txp(sfp_2_tx_p),
-    .txn(sfp_2_tx_n),
-    .rxp(sfp_2_rx_p),
-    .rxn(sfp_2_rx_n),
-    .configuration_vector(sfp_config_vector),
-    .status_vector(sfp_2_status_vector),
-    .core_status(sfp_2_core_status),
-    .tx_resetdone(),
-    .rx_resetdone(),
-    .signal_detect(1'b1),
-    .tx_fault(1'b0),
-    .drp_req(),
-    .drp_gnt(1'b1),
-    .drp_den_o(),
-    .drp_dwe_o(),
-    .drp_daddr_o(),
-    .drp_di_o(),
-    .drp_drdy_o(),
-    .drp_drpdo_o(),
-    .drp_den_i(1'b0),
-    .drp_dwe_i(1'b0),
-    .drp_daddr_i(16'd0),
-    .drp_di_i(16'd0),
-    .drp_drdy_i(1'b0),
-    .drp_drpdo_i(16'd0),
-    .pma_pmd_type(3'd0),
-    .tx_disable()
-);
-
-ten_gig_eth_pcs_pma_1
-sfp_3_pcs_pma_inst (
-    .dclk(clk_125mhz_int),
-    .rxrecclk_out(),
-    .coreclk(sfp_coreclk),
-    .txusrclk(sfp_txusrclk),
-    .txusrclk2(sfp_txusrclk2),
-    .txoutclk(),
-    .areset(sfp_reset_in),
-    .areset_coreclk(sfp_areset_datapathclk),
-    .gttxreset(sfp_gttxreset),
-    .gtrxreset(sfp_gtrxreset),
-    .sim_speedup_control(1'b0),
-    .txuserrdy(sfp_txuserrdy),
-    .qplllock(sfp_qplllock),
-    .qplloutclk(sfp_qplloutclk),
-    .qplloutrefclk(sfp_qplloutrefclk),
-    .reset_counter_done(sfp_reset_counter_done),
-    .xgmii_txd(sfp_3_txd_int),
-    .xgmii_txc(sfp_3_txc_int),
-    .xgmii_rxd(sfp_3_rxd_int),
-    .xgmii_rxc(sfp_3_rxc_int),
-    .txp(sfp_3_tx_p),
-    .txn(sfp_3_tx_n),
-    .rxp(sfp_3_rx_p),
-    .rxn(sfp_3_rx_n),
-    .configuration_vector(sfp_config_vector),
-    .status_vector(sfp_3_status_vector),
-    .core_status(sfp_3_core_status),
-    .tx_resetdone(),
-    .rx_resetdone(),
-    .signal_detect(1'b1),
-    .tx_fault(1'b0),
-    .drp_req(),
-    .drp_gnt(1'b1),
-    .drp_den_o(),
-    .drp_dwe_o(),
-    .drp_daddr_o(),
-    .drp_di_o(),
-    .drp_drdy_o(),
-    .drp_drpdo_o(),
-    .drp_den_i(1'b0),
-    .drp_dwe_i(1'b0),
-    .drp_daddr_i(16'd0),
-    .drp_di_i(16'd0),
-    .drp_drdy_i(1'b0),
-    .drp_drpdo_i(16'd0),
-    .pma_pmd_type(3'd0),
-    .tx_disable()
-);
-
-ten_gig_eth_pcs_pma_1
-sfp_4_pcs_pma_inst (
-    .dclk(clk_125mhz_int),
-    .rxrecclk_out(),
-    .coreclk(sfp_coreclk),
-    .txusrclk(sfp_txusrclk),
-    .txusrclk2(sfp_txusrclk2),
-    .txoutclk(),
-    .areset(sfp_reset_in),
-    .areset_coreclk(sfp_areset_datapathclk),
-    .gttxreset(sfp_gttxreset),
-    .gtrxreset(sfp_gtrxreset),
-    .sim_speedup_control(1'b0),
-    .txuserrdy(sfp_txuserrdy),
-    .qplllock(sfp_qplllock),
-    .qplloutclk(sfp_qplloutclk),
-    .qplloutrefclk(sfp_qplloutrefclk),
-    .reset_counter_done(sfp_reset_counter_done),
-    .xgmii_txd(sfp_4_txd_int),
-    .xgmii_txc(sfp_4_txc_int),
-    .xgmii_rxd(sfp_4_rxd_int),
-    .xgmii_rxc(sfp_4_rxc_int),
-    .txp(sfp_4_tx_p),
-    .txn(sfp_4_tx_n),
-    .rxp(sfp_4_rx_p),
-    .rxn(sfp_4_rx_n),
-    .configuration_vector(sfp_config_vector),
-    .status_vector(sfp_4_status_vector),
-    .core_status(sfp_4_core_status),
-    .tx_resetdone(),
-    .rx_resetdone(),
     .signal_detect(1'b1),
     .tx_fault(1'b0),
     .drp_req(),
@@ -1260,14 +1026,8 @@ assign ptp_clk = clk_156mhz_int;
 assign ptp_rst = rst_156mhz_int;
 assign ptp_sample_clk = clk_125mhz_int;
 
-assign sfp_1_led[0] = sfp_1_rx_block_lock;
-assign sfp_1_led[1] = 1'b0;
-assign sfp_2_led[0] = sfp_2_rx_block_lock;
-assign sfp_2_led[1] = 1'b0;
-assign sfp_3_led[0] = sfp_3_rx_block_lock;
-assign sfp_3_led[1] = 1'b0;
-assign sfp_4_led[0] = sfp_4_rx_block_lock;
-assign sfp_4_led[1] = 1'b0;
+assign sfp_led[0] = sfp_rx_block_lock;
+assign sfp_led[1] = 1'b0;
 assign led = led_int;
 
 fpga_core #(
@@ -1509,66 +1269,21 @@ core_inst (
     /*
      * Ethernet: SFP+
      */
-    .sfp_1_tx_clk(sfp_1_tx_clk_int),
-    .sfp_1_tx_rst(sfp_1_tx_rst_int),
-    .sfp_1_txd(sfp_1_txd_int),
-    .sfp_1_txc(sfp_1_txc_int),
-    .sfp_1_rx_clk(sfp_1_rx_clk_int),
-    .sfp_1_rx_rst(sfp_1_rx_rst_int),
-    .sfp_1_rxd(sfp_1_rxd_int),
-    .sfp_1_rxc(sfp_1_rxc_int),
-    .sfp_1_rx_status(sfp_1_rx_block_lock),
+    .sfp_tx_clk(sfp_tx_clk_int),
+    .sfp_tx_rst(sfp_tx_rst_int),
+    .sfp_txd(sfp_txd_int),
+    .sfp_txc(sfp_txc_int),
+    .sfp_rx_clk(sfp_rx_clk_int),
+    .sfp_rx_rst(sfp_rx_rst_int),
+    .sfp_rxd(sfp_rxd_int),
+    .sfp_rxc(sfp_rxc_int),
+    .sfp_rx_status(sfp_rx_block_lock),
 
-    .sfp_2_tx_clk(sfp_2_tx_clk_int),
-    .sfp_2_tx_rst(sfp_2_tx_rst_int),
-    .sfp_2_txd(sfp_2_txd_int),
-    .sfp_2_txc(sfp_2_txc_int),
-    .sfp_2_rx_clk(sfp_2_rx_clk_int),
-    .sfp_2_rx_rst(sfp_2_rx_rst_int),
-    .sfp_2_rxd(sfp_2_rxd_int),
-    .sfp_2_rxc(sfp_2_rxc_int),
-    .sfp_2_rx_status(sfp_2_rx_block_lock),
-
-    .sfp_3_tx_clk(sfp_3_tx_clk_int),
-    .sfp_3_tx_rst(sfp_3_tx_rst_int),
-    .sfp_3_txd(sfp_3_txd_int),
-    .sfp_3_txc(sfp_3_txc_int),
-    .sfp_3_rx_clk(sfp_3_rx_clk_int),
-    .sfp_3_rx_rst(sfp_3_rx_rst_int),
-    .sfp_3_rxd(sfp_3_rxd_int),
-    .sfp_3_rxc(sfp_3_rxc_int),
-    .sfp_3_rx_status(sfp_3_rx_block_lock),
-
-    .sfp_4_tx_clk(sfp_4_tx_clk_int),
-    .sfp_4_tx_rst(sfp_4_tx_rst_int),
-    .sfp_4_txd(sfp_4_txd_int),
-    .sfp_4_txc(sfp_4_txc_int),
-    .sfp_4_rx_clk(sfp_4_rx_clk_int),
-    .sfp_4_rx_rst(sfp_4_rx_rst_int),
-    .sfp_4_rxd(sfp_4_rxd_int),
-    .sfp_4_rxc(sfp_4_rxc_int),
-    .sfp_4_rx_status(sfp_4_rx_block_lock),
-
-    .sfp_1_mod_detect(sfp_1_mod_detect_int),
-    .sfp_2_mod_detect(sfp_2_mod_detect_int),
-    .sfp_3_mod_detect(sfp_3_mod_detect_int),
-    .sfp_4_mod_detect(sfp_4_mod_detect_int),
-    .sfp_1_rs(sfp_1_rs),
-    .sfp_2_rs(sfp_2_rs),
-    .sfp_3_rs(sfp_3_rs),
-    .sfp_4_rs(sfp_4_rs),
-    .sfp_1_los(sfp_1_los_int),
-    .sfp_2_los(sfp_2_los_int),
-    .sfp_3_los(sfp_3_los_int),
-    .sfp_4_los(sfp_4_los_int),
-    .sfp_1_tx_disable(sfp_1_tx_disable),
-    .sfp_2_tx_disable(sfp_2_tx_disable),
-    .sfp_3_tx_disable(sfp_3_tx_disable),
-    .sfp_4_tx_disable(sfp_4_tx_disable),
-    .sfp_1_tx_fault(sfp_1_tx_fault_int),
-    .sfp_2_tx_fault(sfp_2_tx_fault_int),
-    .sfp_3_tx_fault(sfp_3_tx_fault_int),
-    .sfp_4_tx_fault(sfp_4_tx_fault_int),
+    .sfp_mod_detect(sfp_mod_detect_int),
+    .sfp_rs(sfp_rs),
+    .sfp_los(sfp_los_int),
+    .sfp_tx_disable(sfp_tx_disable),
+    .sfp_tx_fault(sfp_tx_fault_int),
 
     .i2c_scl_i(i2c_scl_i_int),
     .i2c_scl_o(i2c_scl_o_int),
